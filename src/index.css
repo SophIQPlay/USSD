@@ -1,0 +1,282 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000000; /* Pure black */
+  color: #ffffff;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  font-size: 1.2rem;
+}
+.header h2 {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.header-icons {
+  display: flex;
+  gap: 20px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  font-size: 1.2rem;
+}
+
+/* Display */
+.display {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-size: 2rem;
+  padding-bottom: 20px;
+  position: relative;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+.backspace {
+  position: absolute;
+  right: 30px;
+  bottom: 25px;
+  font-size: 1.5rem;
+  color: #aaaaaa;
+}
+
+/* Keypad */
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px 0;
+  justify-items: center;
+  padding: 0 30px;
+}
+.btn {
+  background: transparent;
+  color: white;
+  border: none;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.num {
+  font-size: 2rem;
+  line-height: 1;
+}
+.sub {
+  font-size: 0.8rem;
+  color: #888888;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  margin-top: 2px;
+  letter-spacing: 1px;
+}
+
+/* Dual SIM Buttons */
+.call-bar {
+  display: flex;
+  justify-content: center;
+  padding: 30px 0;
+}
+.sim-buttons {
+  display: flex;
+  background-color: #26c062;
+  border-radius: 40px;
+  overflow: hidden;
+}
+.sim-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  height: 60px;
+  width: 110px;
+  font-size: 1.8rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+.sim-btn.sim-1 {
+  border-right: 1px solid #1e9a4e;
+}
+.sim-badge {
+  position: absolute;
+  top: 15px;
+  right: 30px;
+  background: #007bff;
+  font-size: 0.5rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+.sim-2 .sim-badge {
+  background: #28a745;
+}
+
+/* Bottom Nav */
+.bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  padding: 15px 0 25px 0;
+  font-size: 1.2rem;
+  color: #888888;
+}
+.nav-item.active {
+  color: #5ab0ff;
+  border-bottom: 2px solid #5ab0ff;
+  padding-bottom: 5px;
+}
+/* USSD Modal */
+.ussd-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; 
+  align-items: flex-end; /* Pushes the modal to the bottom of the visible screen */
+  padding-bottom: 10px; /* Creates the narrow gap between the modal and the keyboard */
+  z-index: 1000;
+}
+.ussd-box {
+  background: #252525; 
+  border-radius: 20px; 
+  width: 96%; /* Increased from 85% to make it stretch almost edge-to-edge */
+  max-width: 420px; /* Increased from 340px to allow the wider stretch */
+  padding: 24px 24px 10px 24px; 
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.ussd-text { 
+  white-space: pre-wrap; 
+  font-size: 1rem; 
+  margin-bottom: 20px; 
+  line-height: 1.2; 
+}
+.ussd-input {
+  width: 100%; 
+  background: transparent; 
+  border: none; 
+  border-bottom: 1.5px solid #ffffff; /* White line instead of blue */
+  color: white; 
+  font-size: 1.2rem; 
+  padding: 5px 0; 
+  margin-bottom: 15px; 
+  outline: none;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+.ussd-actions { 
+  display: flex; 
+  align-items: center;
+  position: relative;
+}
+/* The faint vertical divider between the buttons */
+.ussd-actions::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 25%;
+  height: 50%;
+  width: 1px;
+  background-color: #555555; 
+}
+.ussd-btn {
+  flex: 1; /* Makes buttons take exactly half the space */
+  background: transparent; 
+  border: none; 
+  color: #5ab0ff; /* Softer, lighter blue */
+  font-size: 1rem; 
+  font-weight: 500; 
+  text-transform: none; /* Removes ALL CAPS */
+  padding: 12px 10px; 
+  cursor: pointer;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  text-align: center;
+}
+/* USSD Bottom Loading Toast */
+.ussd-loading-toast {
+  position: fixed;
+  bottom: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #252525;
+  color: white;
+  padding: 18px 24px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  font-size: 1rem;
+  z-index: 1000;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.spinner {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  animation: spin 1.5s linear infinite;
+}
+
+.dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* 3 Blue dots, 1 Green dot */
+.dot:nth-child(1) { top: 0; left: 7px; background: #3b82f6; } 
+.dot:nth-child(2) { top: 7px; right: 0; background: #3b82f6; } 
+.dot:nth-child(3) { bottom: 0; left: 7px; background: #26c062; } 
+.dot:nth-child(4) { top: 7px; left: 0; background: #3b82f6; } 
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* MMI System Error */
+.mmi-error-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.4); display: flex; align-items: flex-end; 
+  justify-content: center; z-index: 2000;
+}
+.mmi-error-box {
+  background: #252525; width: 90%; max-width: 400px; padding: 20px; 
+  border-radius: 12px; margin-bottom: 20px;
+  font-family: system-ui; display: flex; flex-direction: column; gap: 20px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+.mmi-text {
+  color: white; font-size: 1.1rem; line-height: 1.4;
+}
+.mmi-btn {
+  align-self: flex-end; color: #3b82f6; background: transparent; border: none;
+  font-weight: 700; font-size: 1.1rem; cursor: pointer; text-transform: uppercase;
+}
