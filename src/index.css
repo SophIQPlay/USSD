@@ -297,3 +297,220 @@ html, body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   white-space: nowrap;
 }
+
+/* Custom USSD Confirmation Modal */
+.ussd-confirm-modal {
+  background: #252525;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 400px;
+  padding: 24px;
+  font-family: system-ui, -apple-system, sans-serif;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+  margin-bottom: 10px;
+}
+
+.ussd-confirm-modal h3 {
+  margin: 0 0 20px 0;
+  color: #fff;
+  text-align: center;
+  font-size: 1.3rem;
+  border-bottom: 1px solid #444;
+  padding-bottom: 15px;
+}
+
+.confirm-details p {
+  display: flex;
+  justify-content: space-between;
+  color: #aaa;
+  margin: 12px 0;
+  font-size: 1.05rem;
+}
+
+.confirm-details strong {
+  color: #fff;
+  text-align: right;
+  max-width: 60%;
+  word-wrap: break-word;
+}
+
+.confirm-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.confirm-btn {
+  padding: 14px;
+  border-radius: 10px;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.confirm-btn:active {
+  opacity: 0.8;
+}
+
+.confirm-btn.yes {
+  background: #26c062;
+  color: #fff;
+}
+
+.confirm-btn.no {
+  background: #ff3b30;
+  color: #fff;
+}
+
+.confirm-btn.cancel {
+  background: transparent;
+  border: 1px solid #555;
+  color: #ccc;
+}
+
+/* SMS Action Modal */
+.sms-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+}
+
+.sms-modal-box {
+  background: #252525;
+  width: 90%;
+  max-width: 380px;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.sms-title {
+  margin: 0 0 15px 0;
+  color: #fff;
+  font-size: 1.2rem;
+  text-align: center;
+  border-bottom: 1px solid #444;
+  padding-bottom: 15px;
+}
+
+.sms-body {
+  color: #ccc;
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 25px;
+  word-wrap: break-word;
+}
+
+.sms-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sms-option-btn {
+  padding: 14px;
+  border-radius: 10px;
+  border: none;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.sms-option-btn:active {
+  opacity: 0.8;
+}
+
+.sms-option-btn.primary {
+  background: #007aff;
+  color: #fff;
+}
+
+.sms-option-btn.secondary {
+  background: #444;
+  color: #fff;
+}
+
+.sms-option-btn.cancel {
+  background: transparent;
+  color: #ff3b30;
+  border: 1px solid #ff3b30;
+}
+
+/* SMS App View */
+.bg-dark { background-color: #000; }
+.sms-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 20px;
+  background: #111;
+  border-bottom: 1px solid #333;
+}
+.sms-header h2 { margin: 0; font-size: 1.2rem; font-weight: 600; }
+
+.sms-full-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sms-bubble {
+  background: #222;
+  padding: 20px;
+  border-radius: 12px;
+}
+.sms-bubble h3 { margin: 0 0 10px 0; color: #fff; font-size: 1.1rem; }
+.sms-bubble p { margin: 0 0 15px 0; color: #ccc; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+
+.sms-tools {
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid #333;
+  padding-top: 10px;
+}
+.sms-tools button {
+  background: transparent; color: #5ab0ff; border: none; 
+  display: flex; align-items: center; gap: 5px; font-size: 0.95rem; cursor: pointer;
+}
+
+.receipt-viewer {
+  display: flex; flex-direction: column; flex: 1;
+  border: 1px solid #333; border-radius: 12px; overflow: hidden;
+}
+.receipt-status-bar {
+  background: #111; padding: 12px 15px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid #333;
+}
+.receipt-status-bar h4 { margin: 0; color: #fff; font-size: 1rem; }
+.badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+.badge.warning { background: #ff9800; color: #000; }
+.badge.success { background: #4caf50; color: #fff; }
+.badge.error { background: #f44336; color: #fff; }
+
+.receipt-frame-wrapper {
+  background: #fff; flex: 1; min-height: 400px;
+  display: flex; flex-direction: column;
+}
+.receipt-iframe {
+  width: 100%; height: 100%; border: none; min-height: 400px;
+}
+.receipt-error {
+  flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  color: #000; padding: 20px; text-align: center;
+}
+.open-ext-btn {
+  margin-top: 15px; padding: 10px 20px; background: #007aff; color: #fff; text-decoration: none; border-radius: 8px;
+}

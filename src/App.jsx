@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, MoreVertical, Delete, Phone, Voicemail, Info, PhoneIncoming, PhoneOutgoing, PhoneMissed } from 'lucide-react';
+import { Search, MoreVertical, Delete, Phone, Voicemail, Info, PhoneIncoming, PhoneOutgoing, PhoneMissed, ArrowLeft, Copy, Share2 } from 'lucide-react';
 import { Contacts } from '@capacitor-community/contacts';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import './index.css';
 
-// --- USSD MENU DEFINITIONS ---
 const USSD_MENUS = {
   HOME: { text: "Welcome to Bank of Abyssinia Mobile Banking Service. Press * to navigate back anytime, select one of the following options below:\n1: Login\n2: Exit", back: null },
   PIN: { text: "Please enter your PIN to login:", back: 'HOME' },
@@ -47,12 +46,13 @@ function App() {
   const [tab, setTab] = useState('keypad'); 
   const [contacts, setContacts] = useState([]);
   const [recents, setRecents] = useState([]);
-  const [recentsFilter, setRecentsFilter] = useState('all'); // 'all' or 'missed'
+  const [recentsFilter, setRecentsFilter] = useState('all'); 
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [isLoadingRecents, setIsLoadingRecents] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
   
   const [ussdState, setUssdState] = useState({ visible: false, isLoading: false, step: 'HOME', message: '', input: '', mmiError: false, data: {} });
+  const [activeSmsView, setActiveSmsView] = useState(null); 
 
   const keys = [
     { num: '1', sub: <Voicemail size={14} strokeWidth={2.5} /> }, { num: '2', sub: 'ABC' }, { num: '3', sub: 'DEF' },
@@ -70,14 +70,42 @@ function App() {
       });
     };
     initSystem();
+
+    let notifListener;
+    LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+      const body = action.notification.body || '';
+      const urlMatch = body.match(/(https?:\/\/[^\s]+)/);
+      const url = urlMatch ? urlMatch[0] : null;
+      
+      setActiveSmsView({
+        notification: action.notification,
+        url: url,
+        fetchStatus: url ? 'loading' : 'idle',
+        statusCode: null
+      });
+    }).then(listener => { notifListener = listener; });
+
+    return () => { if (notifListener) notifListener.remove(); };
   }, []);
+
+  useEffect(() => {
+    if (activeSmsView && activeSmsView.url && activeSmsView.fetchStatus === 'loading') {
+      fetch(activeSmsView.url, { mode: 'no-cors' }) 
+        .then(res => {
+          if (!res.ok && res.type !== 'opaque') throw res;
+          setActiveSmsView(prev => ({ ...prev, fetchStatus: 'success', statusCode: res.status || 200 }));
+        })
+        .catch(err => {
+          setActiveSmsView(prev => ({ ...prev, fetchStatus: 'error', statusCode: err.status || 'Network Error' }));
+        });
+    }
+  }, [activeSmsView]);
 
   useEffect(() => {
     if (tab === 'contacts' && contacts.length === 0) loadContacts();
     if (tab === 'recents' && recents.length === 0) loadCallLogs();
   }, [tab]);
 
-  // --- FIXED CONTACTS FUNCTION ---
   const loadContacts = async () => {
     setIsLoadingContacts(true);
     try {
@@ -85,11 +113,8 @@ function App() {
       if (perm.contacts !== 'granted') perm = await Contacts.requestPermissions();
       
       if (perm.contacts === 'granted') {
-        const result = await Contacts.getContacts(); // Removed projection to fix fetching bug
-        
-        // Filter out empty contacts or those without phones
+        const result = await Contacts.getContacts(); 
         const validContacts = (result.contacts || []).filter(c => c.phones && c.phones.length > 0);
-        
         const sorted = validContacts.sort((a, b) => 
           (a.name?.display || '').localeCompare(b.name?.display || '')
         );
@@ -213,7 +238,6 @@ function App() {
     }, processingDelay);
   };
 
-  // --- UI HELPERS ---
   const renderCallIcon = (type) => {
     switch(parseInt(type)) {
       case 1: return <PhoneIncoming size={16} color="#4caf50" />;
@@ -223,9 +247,49 @@ function App() {
     }
   };
 
-  const filteredRecents = recentsFilter === 'missed' 
-    ? recents.filter(r => parseInt(r.type) === 3 || parseInt(r.type) === 5) 
-    : recents;
+  if (activeSmsView) {
+    return (
+      <div className="app bg-dark">
+        <header className="sms-header">
+          <ArrowLeft size={24} onClick={() => setActiveSmsView(null)} style={{ cursor: 'pointer' }} />
+          <h2>Message Details</h2>
+        </header>
+        <div className="sms-full-content">
+          <div className="sms-bubble">
+            <h3>{activeSmsView.notification.title || 'Message'}</h3>
+            <p>{activeSmsView.notification.body}</p>
+            <div className="sms-tools">
+              <button onClick={() => navigator.clipboard.writeText(activeSmsView.notification.body)}><Copy size={16}/> Copy</button>
+              <button><Share2 size={16}/> Share</button>
+            </div>
+          </div>
+          
+          {activeSmsView.url && (
+            <div className="receipt-viewer">
+              <div className="receipt-status-bar">
+                <h4>Linked Receipt</h4>
+                {activeSmsView.fetchStatus === 'loading' && <span className="badge warning">Loading...</span>}
+                {activeSmsView.fetchStatus === 'success' && <span className="badge success">Loaded</span>}
+                {activeSmsView.fetchStatus === 'error' && <span className="badge error">Failed ({activeSmsView.statusCode})</span>}
+              </div>
+              
+              <div className="receipt-frame-wrapper">
+                {activeSmsView.fetchStatus === 'error' ? (
+                  <div className="receipt-error">
+                    <p>Could not load receipt securely.</p>
+                    <small>HTTP Status: {activeSmsView.statusCode}</small>
+                    <a href={activeSmsView.url} target="_blank" rel="noreferrer" className="open-ext-btn">Open in Browser</a>
+                  </div>
+                ) : (
+                  <iframe src={activeSmsView.url} title="Receipt" className="receipt-iframe" />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -266,7 +330,6 @@ function App() {
 
       {tab === 'recents' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-          {/* Categorization Tabs */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', margin: '15px 0' }}>
             <button 
               onClick={() => setRecentsFilter('all')} 
@@ -279,7 +342,7 @@ function App() {
           </div>
 
           {isLoadingRecents ? <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Loading Recents...</div> : 
-            filteredRecents.map((r, i) => (
+            (recentsFilter === 'missed' ? recents.filter(r => parseInt(r.type) === 3 || parseInt(r.type) === 5) : recents).map((r, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '15px 0', borderBottom: '1px solid #333' }}>
                 <div style={{ flex: 1 }} onClick={() => handleCall(r.number || r.num)}>
                   <div style={{ fontSize: '1.2rem', fontFamily: 'system-ui', color: (r.type == 3 || r.type == 5) ? '#ff3b30' : 'var(--text-color)', fontWeight: '500' }}>
@@ -290,7 +353,6 @@ function App() {
                     {r.date ? new Date(parseInt(r.date)).toLocaleString() : r.time}
                   </div>
                 </div>
-                {/* Info and More Options */}
                 <div style={{ padding: '10px', color: '#007aff', cursor: 'pointer' }} onClick={() => alert(`Showing info for ${r.cachedName || r.number}`)}>
                   <Info size={22} />
                 </div>

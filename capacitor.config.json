@@ -1,5 +1,11 @@
 {
-  "appId": "com.samsung_phone.app",
-  "appName": "Phone",
-  "webDir": "dist"
+  "appId": "com.example.app",
+  "appName": "my-react-app",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true,
+    "allowNavigation": [
+      "*"
+    ]
+  }
 }
