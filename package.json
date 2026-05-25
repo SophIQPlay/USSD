@@ -16,6 +16,7 @@
     "@capacitor/core": "^8.3.4",
     "@capacitor/local-notifications": "^8.2.0",
     "call-number": "^1.0.1",
+    "cordova-plugin-calllog": "^1.3.2",
     "lucide-react": "^1.16.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
