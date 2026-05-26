@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, MoreVertical, Delete, Phone, Voicemail, Info, PhoneIncoming, PhoneOutgoing, PhoneMissed, ArrowLeft, Copy, Share2, Settings, Plus, Save, Upload, Download, User } from 'lucide-react';
+import { Search, MoreVertical, Delete, Phone, Voicemail, Info, PhoneIncoming, PhoneOutgoing, PhoneMissed, ArrowLeft, Copy, Share2, Settings, Plus, Save, Upload, Download, User, MessageSquare } from 'lucide-react';
 import { Contacts } from '@capacitor-community/contacts';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import boaLogo from './assets/BOA.png'; 
@@ -19,7 +19,6 @@ const getCurrentDate = () => {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
-// --- DEFAULT ADMIN CONFIGURATION ---
 const DEFAULT_CONFIG = {
   pin: '6085',
   userName: 'Daniel',
@@ -45,16 +44,28 @@ function App() {
   const [ussdState, setUssdState] = useState({ visible: false, isLoading: false, step: 'HOME', message: '', input: '', mmiError: false, data: {} });
   const [activeSmsView, setActiveSmsView] = useState(null); 
 
-  // --- ADMIN & CACHE STATE ---
   const [config, setConfig] = useState(() => {
     const cached = localStorage.getItem('ussd_admin_config');
     return cached ? JSON.parse(cached) : DEFAULT_CONFIG;
   });
+  
+  const [smsList, setSmsList] = useState(() => {
+    const cached = localStorage.getItem('ussd_sms_cache');
+    return cached ? JSON.parse(cached) : [];
+  });
+
+  const [deviceSms, setDeviceSms] = useState([]);
+  const [isLoadingSms, setIsLoadingSms] = useState(false);
+  
   const [importData, setImportData] = useState('');
 
   useEffect(() => {
     localStorage.setItem('ussd_admin_config', JSON.stringify(config));
   }, [config]);
+
+  useEffect(() => {
+    localStorage.setItem('ussd_sms_cache', JSON.stringify(smsList));
+  }, [smsList]);
 
   const keys = [
     { num: '1', sub: <Voicemail size={14} strokeWidth={2.5} /> }, { num: '2', sub: 'ABC' }, { num: '3', sub: 'DEF' },
@@ -76,9 +87,11 @@ function App() {
     let notifListener;
     LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
       const body = action.notification.body || '';
-      const urlMatch = body.match(/(https?:\/\/[^\s]+)/);
-      const url = urlMatch ? urlMatch[0] : null;
-      setActiveSmsView({ notification: action.notification, url: url, fetchStatus: url ? 'loading' : 'idle', statusCode: null });
+      setActiveSmsView({ 
+        sender: action.notification.title || 'Notification', 
+        body: body,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      });
     }).then(listener => { notifListener = listener; });
 
     return () => { if (notifListener) notifListener.remove(); };
@@ -87,40 +100,49 @@ function App() {
   useEffect(() => {
     if (tab === 'contacts' && contacts.length === 0) loadContacts();
     if (tab === 'recents' && recents.length === 0) loadCallLogs();
+    if (tab === 'messages' && deviceSms.length === 0) loadDeviceSms();
   }, [tab]);
 
-  // --- FIXED CONTACTS FUNCTION ---
-const loadContacts = async () => {
+  const loadDeviceSms = () => {
+    if (!window.SMS) return; // Fails silently if plugin isn't installed
+    setIsLoadingSms(true);
+    window.SMS.hasPermission((hasPerm) => {
+      if (hasPerm) fetchActualSms();
+      else window.SMS.requestPermission(() => fetchActualSms(), () => setIsLoadingSms(false));
+    }, () => setIsLoadingSms(false));
+  };
+
+  const fetchActualSms = () => {
+    window.SMS.listSMS({ box: 'inbox', maxCount: 150 }, (data) => {
+      const formatted = (data || []).map(s => ({
+        id: s._id || Math.random().toString(),
+        sender: s.address,
+        body: s.body,
+        time: new Date(s.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })
+      }));
+      setDeviceSms(formatted);
+      setIsLoadingSms(false);
+    }, () => setIsLoadingSms(false));
+  };
+
+  const loadContacts = async () => {
     setIsLoadingContacts(true);
     try {
-      // 1. Request/Check Permissions explicitly
       let status = await Contacts.checkPermissions();
       if (status.contacts !== 'granted') {
         status = await Contacts.requestPermissions();
       }
       
       if (status.contacts === 'granted') {
-        // 2. Fetch contacts without arguments to ensure maximum compatibility
         const result = await Contacts.getContacts(); 
-        
-        // 3. Debugging: If empty, log the raw result to console
-        if (!result.contacts || result.contacts.length === 0) {
-          console.log("Raw contact fetch result:", result);
-        }
-
         const rawContacts = result.contacts || [];
-        
-        // 4. Map and normalize data based on common Capacitor/Android structures
         const normalized = rawContacts.map(c => ({
           name: c.name?.display || c.displayName || 'Unknown',
-          // Handle both 'phones' and 'phoneNumbers' key variations
           phone: (c.phones && c.phones.length > 0) ? c.phones[0].number : 
                  (c.phoneNumbers && c.phoneNumbers.length > 0) ? c.phoneNumbers[0].number : null
-        })).filter(c => c.phone !== null); // Only keep contacts with phone numbers
+        })).filter(c => c.phone !== null); 
 
         setContacts(normalized.sort((a, b) => a.name.localeCompare(b.name)));
-      } else {
-        console.warn("Contact permission denied by user.");
       }
     } catch (e) {
       console.error('Failed to load contacts:', e);
@@ -165,7 +187,6 @@ const loadContacts = async () => {
 
   const closeUssd = () => { setUssdState({ visible: false, isLoading: false, step: 'HOME', message: '', input: '', mmiError: false, data: {} }); setNumber(''); };
 
-  // --- DYNAMIC USSD MENUS ---
   const getTargetName = (num) => {
     const acc = config.savedAccounts.find(a => a.number === num);
     return acc ? acc.name : "UNKNOWN ACCOUNT";
@@ -237,13 +258,26 @@ const loadContacts = async () => {
             const transferAmt = parseFloat(nextData.amount);
             const sourceIndex = config.myAccounts.findIndex(a => a.number === nextData.source);
             let newBalance = 0;
+            
             if (sourceIndex !== -1) {
               newBalance = (parseFloat(config.myAccounts[sourceIndex].balance) || 0) - transferAmt;
               const updatedAccs = [...config.myAccounts];
               updatedAccs[sourceIndex].balance = newBalance;
-              setConfig({...config, myAccounts: updatedAccs});
+              setConfig({...config, myAccounts: updatedAccs}); 
             }
             nextData.remainingBalance = newBalance;
+
+            const smsBody = `Dear ${config.userName}, your account 1*******1 was debited with ETB ${transferAmt.toFixed(2)}. Available Balance: ETB ${newBalance.toFixed(2)}. Receipt: https://cs.bankofabyssinia.com/slip/?trx=FT26${nextData.trxId}`;
+            
+            const newSms = {
+              id: Date.now().toString(),
+              sender: 'BOA',
+              title: 'Bank of Abyssinia',
+              body: smsBody,
+              time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            };
+            setSmsList(prev => [newSms, ...prev]);
+
           } else {
             shouldClose = true;
           }
@@ -264,10 +298,11 @@ const loadContacts = async () => {
       else {
         setUssdState({ visible: true, isLoading: false, step: nextStep, message: getMessageForStep(nextStep, nextData), input: '', data: nextData, mmiError: false });
         if (nextStep === 'TRANSFER_BOA_SUCCESS') {
+          const pushBody = `Dear ${config.userName}, your account 1*******1 was debited with ETB ${parseFloat(nextData.amount).toFixed(2)}. Available Balance: ETB ${parseFloat(nextData.remainingBalance).toFixed(2)}. Receipt: https://cs.bankofabyssinia.com/slip/?trx=FT26${nextData.trxId}`;
           LocalNotifications.schedule({
             notifications: [{
               title: "BOA",
-              body: `Dear ${config.userName}, your account 1*******1 was debited with ETB ${parseFloat(nextData.amount).toFixed(2)}. Available Balance: ETB ${parseFloat(nextData.remainingBalance).toFixed(2)}. Receipt: https://cs.bankofabyssinia.com/slip/?trx=FT26${nextData.trxId}`,
+              body: pushBody,
               id: Math.floor(Math.random() * 100000), schedule: { at: new Date(Date.now() + 5000) }, channelId: 'sms-alerts', smallIcon: "ic_sms_notification",
             }]
           });
@@ -287,29 +322,35 @@ const loadContacts = async () => {
 
   if (activeSmsView) {
     return (
-      <div className="app bg-dark">
-        <header className="sms-header">
-          <ArrowLeft size={24} onClick={() => setActiveSmsView(null)} style={{ cursor: 'pointer' }} />
-          <h2>Message Details</h2>
-        </header>
-        <div className="sms-full-content">
-          <div className="sms-bubble">
-            <h3>{activeSmsView.notification.title || 'Message'}</h3>
-            <p>{activeSmsView.notification.body}</p>
-            <div className="sms-tools">
-              <button onClick={() => navigator.clipboard.writeText(activeSmsView.notification.body)}><Copy size={16}/> Copy</button>
-              <button><Share2 size={16}/> Share</button>
-            </div>
+      <div className="app bg-dark" style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#000', color: '#fff' }}>
+        <header style={{ padding: '20px', display: 'flex', alignItems: 'center', borderBottom: '1px solid #222', background: '#111' }}>
+          <ArrowLeft size={24} onClick={() => setActiveSmsView(null)} style={{ cursor: 'pointer', marginRight: '15px' }} />
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: '#444', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '10px' }}><User size={18}/></div>
+            <h2 style={{ fontSize: '1.1rem', margin: 0 }}>{activeSmsView.sender || 'Unknown Sender'}</h2>
           </div>
-          {activeSmsView.url && (
-            <div className="receipt-viewer" style={{ padding: '20px', background: '#111', display: 'flex', justifyContent: 'center' }}>
-              <img src={boaLogo} alt="Bank of Abyssinia" style={{ maxWidth: '100%', height: 'auto', borderRadius: '12px' }} />
-            </div>
-          )}
+        </header>
+        
+        <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ alignSelf: 'center', fontSize: '0.8rem', color: '#888', marginBottom: '20px' }}>
+            {activeSmsView.time || 'Today'}
+          </div>
+          
+          <div style={{ alignSelf: 'flex-start', background: '#262628', padding: '15px', borderRadius: '18px', borderBottomLeftRadius: '4px', maxWidth: '85%', lineHeight: '1.4' }}>
+            <p style={{ margin: 0, wordWrap: 'break-word' }}>{activeSmsView.body}</p>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '15px', marginTop: '20px', marginLeft: '5px' }}>
+            <button onClick={() => navigator.clipboard.writeText(activeSmsView.body)} style={{ background: 'transparent', border: 'none', color: '#0a84ff', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: 0 }}>
+              <Copy size={16}/> Copy
+            </button>
+          </div>
         </div>
       </div>
     );
   }
+
+  const allMessages = [...smsList, ...deviceSms];
 
   return (
     <div className="app">
@@ -333,8 +374,8 @@ const loadContacts = async () => {
           </div>
           <div className="call-bar">
             <div className="sim-buttons">
-              <button className="sim-btn sim-1" onClick={() => handleCall(number)}><Phone size={24} fill="currentColor" stroke="none" /><span className="sim-badge">1</span></button>
-              <button className="sim-btn sim-2" onClick={() => handleCall(number)}><Phone size={24} fill="currentColor" stroke="none" /><span className="sim-badge">2</span></button>
+              <button className="sim-btn sim-1" onClick={() => handleCall(number)}><Phone size={24} fill="currentColor" stroke="none" /></button>
+              
             </div>
           </div>
         </>
@@ -362,14 +403,13 @@ const loadContacts = async () => {
         </div>
       )}
 
-{tab === 'contacts' && (
+      {tab === 'contacts' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
           {isLoadingContacts ? (
             <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Loading...</div>
           ) : contacts.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>
               No contacts found. 
-              <br/><small>(Check if contacts are synced to your account)</small>
             </div>
           ) : (
             contacts.map((c, i) => (
@@ -382,7 +422,42 @@ const loadContacts = async () => {
         </div>
       )}
 
-      {/* --- ADMIN VIEW --- */}
+      {tab === 'messages' && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px', background: '#000' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '20px 0' }}>
+             <h3 style={{ margin: 0, color: '#fff' }}>SMS</h3>
+             {window.SMS && (
+               <button onClick={loadDeviceSms} style={{ background: '#333', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', fontSize: '0.8rem' }}>
+                 {isLoadingSms ? 'Syncing...' : 'Sync Phone SMS'}
+               </button>
+             )}
+          </div>
+          
+          {allMessages.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>No messages found.</div>
+          ) : (
+            allMessages.map((sms) => (
+              <div key={sms.id} onClick={() => setActiveSmsView(sms)} style={{ display: 'flex', padding: '15px 0', borderBottom: '1px solid #222', cursor: 'pointer' }}>
+                <div style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '15px' }}>
+                  <MessageSquare size={20} color="#fff" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 'bold', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+                      {sms.sender}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: '#888', whiteSpace: 'nowrap' }}>{sms.time}</span>
+                  </div>
+                  <div style={{ color: '#aaa', fontSize: '0.9rem', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {sms.body}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {tab === 'admin' && (
         <div className="admin-container">
           <div className="admin-section">
@@ -440,9 +515,9 @@ const loadContacts = async () => {
         <span className={`nav-item ${tab === 'keypad' ? 'active' : ''}`} onClick={() => setTab('keypad')}>Keypad</span>
         <span className={`nav-item ${tab === 'recents' ? 'active' : ''}`} onClick={() => setTab('recents')}>Recents</span>
         <span className={`nav-item ${tab === 'contacts' ? 'active' : ''}`} onClick={() => setTab('contacts')}>Contacts</span>
+        <span className={`nav-item ${tab === 'messages' ? 'active' : ''}`} onClick={() => setTab('messages')}>SMS</span>
       </nav>
 
-      {/* --- USSD Modals --- */}
       {ussdState.visible && (
         <div className={ussdState.isLoading ? "ussd-loading-toast" : "ussd-overlay"}>
           {ussdState.isLoading ? (
