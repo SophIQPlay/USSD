@@ -1,31 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, MoreVertical, Delete, Phone, Voicemail, Info, PhoneIncoming, PhoneOutgoing, PhoneMissed, ArrowLeft, Copy, Share2 } from 'lucide-react';
+import { Search, MoreVertical, Delete, Phone, Voicemail, Info, PhoneIncoming, PhoneOutgoing, PhoneMissed, ArrowLeft, Copy, Share2, Settings, Plus, Save, Upload, Download, User } from 'lucide-react';
 import { Contacts } from '@capacitor-community/contacts';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import boaLogo from './assets/BOA.png'; 
 import './index.css';
-
-const USSD_MENUS = {
-  HOME: { text: "Welcome to Bank of Abyssinia Mobile Banking Service. Press * to navigate back anytime, select one of the following options below:\n1: Login\n2: Exit", back: null },
-  PIN: { text: "Please enter your PIN to login:", back: 'HOME' },
-  PIN_ERROR: { text: "Please enter your PIN to login:\nHave you changed your PIN?", back: 'HOME' },
-  MAIN_MENU: { text: "Welcome to BOA\n1. My Accounts\n2. Transfer\n3. Transfer to Other Bank\n4. Transfer to Own\n5. Airtime\n6. Utilities\n7. Exchange Rates\n8. More options", back: 'HOME' },
-  MY_ACCOUNTS: { text: "1: 107988203 - ETB - SAVI.\n2: 128776001 - ETB - AFLA.", back: 'MAIN_MENU' },
-  ACC_1_DETAIL: { text: "107988203 - ETB - SAVI.\nCleared Balance is ETB 60.81 and Ledger Balane is ETB 60.81\nTransactions\n1: - 07/05 151.09\n2: - 07/05 200.00\n3: More options", back: 'MY_ACCOUNTS' },
-  ACC_2_DETAIL: { text: "128776001 - ETB - AFLA.\nCleared Balance is ETB 50.01 and Ledger Balane is ETB 50.01\nTransactions\n1: - 07/05 101.00\n2: - 07/05 2080.00\n3: More options", back: 'MY_ACCOUNTS' },
-  TRANSFER_MENU: { text: "1: Transfer within BOA\n2: ATM withdrawal\n3: Load to TeleBirr\n4: Transfer to M-PESA\n5: Awach\n6: Telebirr Agent", back: 'MAIN_MENU' },
-  TRANSFER_BOA_INPUT: { text: "Enter Account No", back: 'TRANSFER_MENU' },
-  TRANSFER_BOA_SELECT: { text: "Transfer within BOA\n1: 107988203 - ETB - SAVINGS\n2: 128776001 - ETB - AFLA", back: 'TRANSFER_BOA_INPUT' },
-  TRANSFER_BOA_AMOUNT: { back: 'TRANSFER_BOA_SELECT' },
-  TRANSFER_BOA_REMARK: { back: 'TRANSFER_BOA_AMOUNT' },
-  TRANSFER_BOA_CONFIRM: { back: 'TRANSFER_BOA_REMARK' },
-  TRANSFER_BOA_SUCCESS: { back: 'MAIN_MENU' },
-  ATM_WITHDRAWAL: { text: "ATM withdrawal\n1: 107988203 - ETB - SAVINGS\n2: 128776001 - ETB - AFLA", back: 'TRANSFER_MENU' },
-  LOAD_TELEBIRR: { text: "Load to TeleBirr\n1: 107988203 - ETB - SAVINGS\n2: 128776001 - ETB - AFLA", back: 'TRANSFER_MENU' },
-  MPESA_INPUT: { text: "Enter M-PESA Registered Number", back: 'TRANSFER_MENU' },
-  OTHER_BANK_MENU: { text: "1: IPS Instant Transfer\n2: Non Instant Transfer", back: 'MAIN_MENU' },
-  OTHER_BANK_1: { text: "Bank\n1: CBE\n2: Awash\n3: Dashen\n4: Wegagen\n5: Hibret\n6: NIB\n7: More options", back: 'OTHER_BANK_MENU' },
-  OTHER_BANK_2: { text: "Bank\n1: COOP\n2: Zemen\n3: Bunna\n4: Global\n5: Enat\n6: Previous options", back: 'OTHER_BANK_1' }
-};
 
 const generateTrxId = () => {
   const length = Math.random() > 0.5 ? 4 : 3;
@@ -41,6 +19,19 @@ const getCurrentDate = () => {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
+// --- DEFAULT ADMIN CONFIGURATION ---
+const DEFAULT_CONFIG = {
+  pin: '6085',
+  userName: 'Daniel',
+  myAccounts: [
+    { number: '107988203', label: 'ETB - SAVINGS', balance: 60.81 },
+    { number: '128776001', label: 'ETB - AFLA', balance: 50.01 }
+  ],
+  savedAccounts: [
+    { number: '233818817', name: 'ESUBALEW AND TENAGNEWORK AND DESALE' }
+  ]
+};
+
 function App() {
   const [number, setNumber] = useState('');
   const [tab, setTab] = useState('keypad'); 
@@ -53,6 +44,17 @@ function App() {
   
   const [ussdState, setUssdState] = useState({ visible: false, isLoading: false, step: 'HOME', message: '', input: '', mmiError: false, data: {} });
   const [activeSmsView, setActiveSmsView] = useState(null); 
+
+  // --- ADMIN & CACHE STATE ---
+  const [config, setConfig] = useState(() => {
+    const cached = localStorage.getItem('ussd_admin_config');
+    return cached ? JSON.parse(cached) : DEFAULT_CONFIG;
+  });
+  const [importData, setImportData] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('ussd_admin_config', JSON.stringify(config));
+  }, [config]);
 
   const keys = [
     { num: '1', sub: <Voicemail size={14} strokeWidth={2.5} /> }, { num: '2', sub: 'ABC' }, { num: '3', sub: 'DEF' },
@@ -76,52 +78,52 @@ function App() {
       const body = action.notification.body || '';
       const urlMatch = body.match(/(https?:\/\/[^\s]+)/);
       const url = urlMatch ? urlMatch[0] : null;
-      
-      setActiveSmsView({
-        notification: action.notification,
-        url: url,
-        fetchStatus: url ? 'loading' : 'idle',
-        statusCode: null
-      });
+      setActiveSmsView({ notification: action.notification, url: url, fetchStatus: url ? 'loading' : 'idle', statusCode: null });
     }).then(listener => { notifListener = listener; });
 
     return () => { if (notifListener) notifListener.remove(); };
   }, []);
 
   useEffect(() => {
-    if (activeSmsView && activeSmsView.url && activeSmsView.fetchStatus === 'loading') {
-      fetch(activeSmsView.url, { mode: 'no-cors' }) 
-        .then(res => {
-          if (!res.ok && res.type !== 'opaque') throw res;
-          setActiveSmsView(prev => ({ ...prev, fetchStatus: 'success', statusCode: res.status || 200 }));
-        })
-        .catch(err => {
-          setActiveSmsView(prev => ({ ...prev, fetchStatus: 'error', statusCode: err.status || 'Network Error' }));
-        });
-    }
-  }, [activeSmsView]);
-
-  useEffect(() => {
     if (tab === 'contacts' && contacts.length === 0) loadContacts();
     if (tab === 'recents' && recents.length === 0) loadCallLogs();
   }, [tab]);
 
-  const loadContacts = async () => {
+  // --- FIXED CONTACTS FUNCTION ---
+const loadContacts = async () => {
     setIsLoadingContacts(true);
     try {
-      let perm = await Contacts.checkPermissions();
-      if (perm.contacts !== 'granted') perm = await Contacts.requestPermissions();
-      
-      if (perm.contacts === 'granted') {
-        const result = await Contacts.getContacts(); 
-        const validContacts = (result.contacts || []).filter(c => c.phones && c.phones.length > 0);
-        const sorted = validContacts.sort((a, b) => 
-          (a.name?.display || '').localeCompare(b.name?.display || '')
-        );
-        setContacts(sorted);
+      // 1. Request/Check Permissions explicitly
+      let status = await Contacts.checkPermissions();
+      if (status.contacts !== 'granted') {
+        status = await Contacts.requestPermissions();
       }
-    } catch (error) {
-      console.error('Failed to load contacts', error);
+      
+      if (status.contacts === 'granted') {
+        // 2. Fetch contacts without arguments to ensure maximum compatibility
+        const result = await Contacts.getContacts(); 
+        
+        // 3. Debugging: If empty, log the raw result to console
+        if (!result.contacts || result.contacts.length === 0) {
+          console.log("Raw contact fetch result:", result);
+        }
+
+        const rawContacts = result.contacts || [];
+        
+        // 4. Map and normalize data based on common Capacitor/Android structures
+        const normalized = rawContacts.map(c => ({
+          name: c.name?.display || c.displayName || 'Unknown',
+          // Handle both 'phones' and 'phoneNumbers' key variations
+          phone: (c.phones && c.phones.length > 0) ? c.phones[0].number : 
+                 (c.phoneNumbers && c.phoneNumbers.length > 0) ? c.phoneNumbers[0].number : null
+        })).filter(c => c.phone !== null); // Only keep contacts with phone numbers
+
+        setContacts(normalized.sort((a, b) => a.name.localeCompare(b.name)));
+      } else {
+        console.warn("Contact permission denied by user.");
+      }
+    } catch (e) {
+      console.error('Failed to load contacts:', e);
     } finally {
       setIsLoadingContacts(false);
     }
@@ -130,54 +132,66 @@ function App() {
   const loadCallLogs = () => {
     if (window.plugins && window.plugins.callLog) {
       setIsLoadingRecents(true);
-      window.plugins.callLog.hasReadPermission((hasPermission) => {
-        if (!hasPermission) {
-          window.plugins.callLog.requestReadPermission(() => fetchLogs(), () => {
-            setIsLoadingRecents(false);
-          });
-        } else fetchLogs();
+      window.plugins.callLog.hasReadPermission((hasPerm) => {
+        if (!hasPerm) window.plugins.callLog.requestReadPermission(() => fetchLogs(), () => setIsLoadingRecents(false));
+        else fetchLogs();
       });
     }
   };
 
   const fetchLogs = () => {
-    window.plugins.callLog.getCallLog([], (data) => {
-      setRecents(data || []);
-      setIsLoadingRecents(false);
-    }, () => setIsLoadingRecents(false));
+    window.plugins.callLog.getCallLog([], (data) => { setRecents(data || []); setIsLoadingRecents(false); }, () => setIsLoadingRecents(false));
   };
 
   const handleCall = (numToCall) => {
     if (!numToCall) return;
+    
+    if (numToCall === '*#666*#') {
+      setTab('admin');
+      setNumber('');
+      return;
+    }
+
     if (numToCall === '*815#') {
       setUssdState({ visible: true, isLoading: true, step: 'HOME', message: '', input: '', mmiError: false, data: {} });
-      setTimeout(() => setUssdState({ visible: true, isLoading: false, step: 'HOME', message: USSD_MENUS.HOME.text, input: '', mmiError: false, data: {} }), 2000);
+      setTimeout(() => setUssdState({ visible: true, isLoading: false, step: 'HOME', message: getMessageForStep('HOME', {}), input: '', mmiError: false, data: {} }), 2000);
       return;
     }
     
-    if (!window.plugins || !window.plugins.callLog) {
-      setRecents(prev => [{ num: numToCall, time: new Date().toLocaleTimeString(), type: 2 }, ...prev]);
-    }
-    
-    if (window.plugins && window.plugins.CallNumber) {
-      window.plugins.CallNumber.callNumber(() => {}, () => {}, numToCall, true);
-    } else {
-      window.open(`tel:${numToCall.replace('#', '%23')}`, '_system');
-    }
+    if (!window.plugins || !window.plugins.callLog) setRecents(prev => [{ num: numToCall, time: new Date().toLocaleTimeString(), type: 2 }, ...prev]);
+    if (window.plugins && window.plugins.CallNumber) window.plugins.CallNumber.callNumber(() => {}, () => {}, numToCall, true);
+    else window.open(`tel:${numToCall.replace('#', '%23')}`, '_system');
   };
 
-  const closeUssd = () => {
-    setUssdState({ visible: false, isLoading: false, step: 'HOME', message: '', input: '', mmiError: false, data: {} });
-    setNumber('');
+  const closeUssd = () => { setUssdState({ visible: false, isLoading: false, step: 'HOME', message: '', input: '', mmiError: false, data: {} }); setNumber(''); };
+
+  // --- DYNAMIC USSD MENUS ---
+  const getTargetName = (num) => {
+    const acc = config.savedAccounts.find(a => a.number === num);
+    return acc ? acc.name : "UNKNOWN ACCOUNT";
   };
 
   const getMessageForStep = (step, data) => {
     switch(step) {
-      case 'TRANSFER_BOA_AMOUNT': return `ESUBALEW AND TENAGNEWORK AND DESALE Requst Debit From ${data.source} For ${data.target}\nEnter Amount`;
-      case 'TRANSFER_BOA_REMARK': return `ESUBALEW AND TENAGNEWORK AND DESALE Requst Debit From ${data.source} For ${data.target}\nEnter Remark`;
+      case 'HOME': return "Welcome to Bank of Abyssinia Mobile Banking Service. Press * to navigate back anytime, select one of the following options below:\n1: Login\n2: Exit";
+      case 'PIN': return "Please enter your PIN to login:";
+      case 'PIN_ERROR': return "Please enter your PIN to login:\nHave you changed your PIN?";
+      case 'MAIN_MENU': return "Welcome to BOA\n1. My Accounts\n2. Transfer\n3. Transfer to Other Bank\n4. Transfer to Own\n5. Airtime\n6. Utilities\n7. Exchange Rates\n8. More options";
+      case 'MY_ACCOUNTS': return config.myAccounts.map((a, i) => `${i+1}: ${a.number} - ${a.label}\nBalance: ETB ${parseFloat(a.balance).toFixed(2)}`).join('\n\n') + `\n\n${config.myAccounts.length + 1}: Back`;
+      case 'TRANSFER_MENU': return "1: Transfer within BOA\n2: ATM withdrawal\n3: Load to TeleBirr\n4: Transfer to M-PESA\n5: Awach\n6: Telebirr Agent";
+      case 'TRANSFER_BOA_INPUT': return "Enter Account No";
+      case 'TRANSFER_BOA_SELECT': return "Transfer within BOA\n" + config.myAccounts.map((a, i) => `${i+1}: ${a.number} - ${a.label}`).join('\n');
+      case 'TRANSFER_BOA_AMOUNT': return `${getTargetName(data.target)} Request Debit From ${data.source} For ${data.target}\nEnter Amount`;
+      case 'TRANSFER_BOA_REMARK': return `${getTargetName(data.target)} Request Debit From ${data.source} For ${data.target}\nEnter Remark`;
       case 'TRANSFER_BOA_CONFIRM': return `Please Confirm\nRequest From ${data.source} For ${data.target}.\nAmount: ${data.amount}\nRemark: ${data.remark}\n1: Yes\n2: No`;
-      case 'TRANSFER_BOA_SUCCESS': return `Complete\nETB ${parseFloat(data.amount).toFixed(2)} debited from ${data.source} For 233818817 (ok done via Mobile) on ${getCurrentDate()} with transaction ID: FT26${data.trxId}`;
-      default: return USSD_MENUS[step]?.text || '';
+      case 'TRANSFER_BOA_SUCCESS': return `Complete\nETB ${parseFloat(data.amount).toFixed(2)} debited from ${data.source} For ${data.target} (ok done via Mobile) on ${getCurrentDate()} with transaction ID: FT26${data.trxId}`;
+      case 'ATM_WITHDRAWAL': return "ATM withdrawal\n" + config.myAccounts.map((a, i) => `${i+1}: ${a.number} - ${a.label}`).join('\n');
+      case 'LOAD_TELEBIRR': return "Load to TeleBirr\n" + config.myAccounts.map((a, i) => `${i+1}: ${a.number} - ${a.label}`).join('\n');
+      case 'MPESA_INPUT': return "Enter M-PESA Registered Number";
+      case 'OTHER_BANK_MENU': return "1: IPS Instant Transfer\n2: Non Instant Transfer";
+      case 'OTHER_BANK_1': return "Bank\n1: CBE\n2: Awash\n3: Dashen\n4: Wegagen\n5: Hibret\n6: NIB\n7: More options";
+      case 'OTHER_BANK_2': return "Bank\n1: COOP\n2: Zemen\n3: Bunna\n4: Global\n5: Enat\n6: Previous options";
+      default: return "";
     }
   };
 
@@ -185,29 +199,55 @@ function App() {
     const input = ussdState.input.trim();
     if (input === '') {
       setUssdState(prev => ({ ...prev, visible: false }));
-      setShowWarning(true);
-      setTimeout(() => { setShowWarning(false); closeUssd(); }, 3000);
-      return;
+      setShowWarning(true); setTimeout(() => { setShowWarning(false); closeUssd(); }, 3000); return;
     }
     
     let nextStep = ussdState.step, shouldClose = false, mmiError = false, processingDelay = 1200; 
     let nextData = { ...ussdState.data };
 
     if (input === '*') {
-      const backStep = USSD_MENUS[ussdState.step]?.back;
-      backStep ? nextStep = backStep : shouldClose = true;
+      if (['PIN', 'PIN_ERROR'].includes(ussdState.step)) nextStep = 'HOME';
+      else if (['MY_ACCOUNTS', 'TRANSFER_MENU', 'OTHER_BANK_MENU'].includes(ussdState.step)) nextStep = 'MAIN_MENU';
+      else if (['TRANSFER_BOA_INPUT', 'ATM_WITHDRAWAL', 'LOAD_TELEBIRR', 'MPESA_INPUT'].includes(ussdState.step)) nextStep = 'TRANSFER_MENU';
+      else if (['TRANSFER_BOA_SELECT'].includes(ussdState.step)) nextStep = 'TRANSFER_BOA_INPUT';
+      else if (['TRANSFER_BOA_AMOUNT'].includes(ussdState.step)) nextStep = 'TRANSFER_BOA_SELECT';
+      else if (['TRANSFER_BOA_REMARK'].includes(ussdState.step)) nextStep = 'TRANSFER_BOA_AMOUNT';
+      else if (['TRANSFER_BOA_CONFIRM'].includes(ussdState.step)) nextStep = 'TRANSFER_BOA_REMARK';
+      else shouldClose = true;
     } else {
       switch (ussdState.step) {
         case 'HOME': input === '1' ? nextStep = 'PIN' : shouldClose = true; break;
-        case 'PIN': case 'PIN_ERROR': input === '6085' ? nextStep = 'MAIN_MENU' : nextStep = 'PIN_ERROR'; break;
+        case 'PIN': case 'PIN_ERROR': input === config.pin ? nextStep = 'MAIN_MENU' : nextStep = 'PIN_ERROR'; break;
         case 'MAIN_MENU': input === '1' ? nextStep = 'MY_ACCOUNTS' : input === '2' ? nextStep = 'TRANSFER_MENU' : input === '3' ? nextStep = 'OTHER_BANK_MENU' : shouldClose = true; break;
-        case 'MY_ACCOUNTS': input === '1' ? nextStep = 'ACC_1_DETAIL' : input === '2' ? nextStep = 'ACC_2_DETAIL' : shouldClose = true; break;
+        case 'MY_ACCOUNTS': shouldClose = true; break; 
         case 'TRANSFER_MENU': input === '1' ? nextStep = 'TRANSFER_BOA_INPUT' : input === '2' ? nextStep = 'ATM_WITHDRAWAL' : input === '3' ? nextStep = 'LOAD_TELEBIRR' : input === '4' ? nextStep = 'MPESA_INPUT' : shouldClose = true; break;
-        case 'TRANSFER_BOA_INPUT': input === '233818817' ? (nextStep = 'TRANSFER_BOA_SELECT', nextData.target = input) : shouldClose = true; break;
-        case 'TRANSFER_BOA_SELECT': (input === '1' || input === '2') ? (nextStep = 'TRANSFER_BOA_AMOUNT', nextData.source = input === '1' ? '107988203' : '128776001') : shouldClose = true; break;
+        case 'TRANSFER_BOA_INPUT': nextStep = 'TRANSFER_BOA_SELECT'; nextData.target = input; break;
+        case 'TRANSFER_BOA_SELECT': 
+          const accIdx = parseInt(input) - 1;
+          if (accIdx >= 0 && accIdx < config.myAccounts.length) { nextStep = 'TRANSFER_BOA_AMOUNT'; nextData.source = config.myAccounts[accIdx].number; } else { shouldClose = true; }
+          break;
         case 'TRANSFER_BOA_AMOUNT': input ? (nextStep = 'TRANSFER_BOA_REMARK', nextData.amount = input) : shouldClose = true; break;
         case 'TRANSFER_BOA_REMARK': input ? (nextStep = 'TRANSFER_BOA_CONFIRM', nextData.remark = input) : shouldClose = true; break;
-        case 'TRANSFER_BOA_CONFIRM': input === '1' ? (nextStep = 'TRANSFER_BOA_SUCCESS', processingDelay = 3500, nextData.trxId = generateTrxId()) : shouldClose = true; break;
+        case 'TRANSFER_BOA_CONFIRM': 
+          if (input === '1') {
+            nextStep = 'TRANSFER_BOA_SUCCESS'; 
+            processingDelay = 3500; 
+            nextData.trxId = generateTrxId();
+            
+            const transferAmt = parseFloat(nextData.amount);
+            const sourceIndex = config.myAccounts.findIndex(a => a.number === nextData.source);
+            let newBalance = 0;
+            if (sourceIndex !== -1) {
+              newBalance = (parseFloat(config.myAccounts[sourceIndex].balance) || 0) - transferAmt;
+              const updatedAccs = [...config.myAccounts];
+              updatedAccs[sourceIndex].balance = newBalance;
+              setConfig({...config, myAccounts: updatedAccs});
+            }
+            nextData.remainingBalance = newBalance;
+          } else {
+            shouldClose = true;
+          }
+          break;
         case 'TRANSFER_BOA_SUCCESS': shouldClose = true; break;
         case 'MPESA_INPUT': if (input.length > 0) mmiError = true; break;
         case 'OTHER_BANK_MENU': (input === '1' || input === '2') ? nextStep = 'OTHER_BANK_1' : shouldClose = true; break;
@@ -219,17 +259,15 @@ function App() {
 
     setUssdState(prev => ({ ...prev, visible: false }));
     setTimeout(() => {
-      if (mmiError) {
-        setUssdState({ visible: false, isLoading: false, step: 'HOME', message: '', input: '', data: {}, mmiError: true });
-      } else if (shouldClose) {
-        closeUssd();
-      } else {
+      if (mmiError) { setUssdState({ visible: false, isLoading: false, step: 'HOME', message: '', input: '', data: {}, mmiError: true }); } 
+      else if (shouldClose) { closeUssd(); } 
+      else {
         setUssdState({ visible: true, isLoading: false, step: nextStep, message: getMessageForStep(nextStep, nextData), input: '', data: nextData, mmiError: false });
         if (nextStep === 'TRANSFER_BOA_SUCCESS') {
           LocalNotifications.schedule({
             notifications: [{
               title: "BOA",
-              body: `Dear Daniel, your account 1*******1 was debited with ETB ${parseFloat(nextData.amount).toFixed(2)}. Available Balance: ETB 50.81. Receipt: https://cs.bankofabyssinia.com/slip/?trx=FT26${nextData.trxId} Link your Fayda: https://cs.bankofabyssinia.com/fayda_connect For help, call 8397.`,
+              body: `Dear ${config.userName}, your account 1*******1 was debited with ETB ${parseFloat(nextData.amount).toFixed(2)}. Available Balance: ETB ${parseFloat(nextData.remainingBalance).toFixed(2)}. Receipt: https://cs.bankofabyssinia.com/slip/?trx=FT26${nextData.trxId}`,
               id: Math.floor(Math.random() * 100000), schedule: { at: new Date(Date.now() + 5000) }, channelId: 'sms-alerts', smallIcon: "ic_sms_notification",
             }]
           });
@@ -263,27 +301,9 @@ function App() {
               <button><Share2 size={16}/> Share</button>
             </div>
           </div>
-          
           {activeSmsView.url && (
-            <div className="receipt-viewer">
-              <div className="receipt-status-bar">
-                <h4>Linked Receipt</h4>
-                {activeSmsView.fetchStatus === 'loading' && <span className="badge warning">Loading...</span>}
-                {activeSmsView.fetchStatus === 'success' && <span className="badge success">Loaded</span>}
-                {activeSmsView.fetchStatus === 'error' && <span className="badge error">Failed ({activeSmsView.statusCode})</span>}
-              </div>
-              
-              <div className="receipt-frame-wrapper">
-                {activeSmsView.fetchStatus === 'error' ? (
-                  <div className="receipt-error">
-                    <p>Could not load receipt securely.</p>
-                    <small>HTTP Status: {activeSmsView.statusCode}</small>
-                    <a href={activeSmsView.url} target="_blank" rel="noreferrer" className="open-ext-btn">Open in Browser</a>
-                  </div>
-                ) : (
-                  <iframe src={activeSmsView.url} title="Receipt" className="receipt-iframe" />
-                )}
-              </div>
+            <div className="receipt-viewer" style={{ padding: '20px', background: '#111', display: 'flex', justifyContent: 'center' }}>
+              <img src={boaLogo} alt="Bank of Abyssinia" style={{ maxWidth: '100%', height: 'auto', borderRadius: '12px' }} />
             </div>
           )}
         </div>
@@ -295,34 +315,26 @@ function App() {
     <div className="app">
       <header className="header">
         <h2>{tab.charAt(0).toUpperCase() + tab.slice(1)}</h2>
-        <div className="header-icons">
-          <Search size={22} strokeWidth={2.5} />
-          <MoreVertical size={22} strokeWidth={2.5} />
-        </div>
+        <div className="header-icons"><Search size={22} /><MoreVertical size={22} /></div>
       </header>
 
       {tab === 'keypad' && (
         <>
           <div className="display">
             {number}
-            {number && (
-              <span className="backspace" style={{ display: 'flex' }} onClick={() => setNumber(prev => prev.slice(0, -1))}>
-                <Delete size={32} strokeWidth={1.5} />
-              </span>
-            )}
+            {number && <span className="backspace" onClick={() => setNumber(prev => prev.slice(0, -1))}><Delete size={32} /></span>}
           </div>
           <div className="keypad">
-            {keys.map((key, index) => (
-              <button key={index} className="btn" onClick={() => setNumber(prev => prev.length < 15 ? prev + key.num : prev)}>
-                <span className="num">{key.num}</span>
-                {key.sub && <span className="sub">{key.sub}</span>}
+            {keys.map((k, i) => (
+              <button key={i} className="btn" onClick={() => setNumber(prev => prev.length < 15 ? prev + k.num : prev)}>
+                <span className="num">{k.num}</span>{k.sub && <span className="sub">{k.sub}</span>}
               </button>
             ))}
           </div>
           <div className="call-bar">
             <div className="sim-buttons">
-              <button className="sim-btn sim-1" onClick={() => handleCall(number)}><Phone size={24} fill="currentColor" stroke="none" /> <span className="sim-badge">1</span></button>
-              <button className="sim-btn sim-2" onClick={() => handleCall(number)}><Phone size={24} fill="currentColor" stroke="none" /> <span className="sim-badge">2</span></button>
+              <button className="sim-btn sim-1" onClick={() => handleCall(number)}><Phone size={24} fill="currentColor" stroke="none" /><span className="sim-badge">1</span></button>
+              <button className="sim-btn sim-2" onClick={() => handleCall(number)}><Phone size={24} fill="currentColor" stroke="none" /><span className="sim-badge">2</span></button>
             </div>
           </div>
         </>
@@ -330,50 +342,97 @@ function App() {
 
       {tab === 'recents' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', margin: '15px 0' }}>
-            <button 
-              onClick={() => setRecentsFilter('all')} 
-              style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #444', color: '#fff', background: recentsFilter === 'all' ? '#333' : 'transparent' }}
-            >All</button>
-            <button 
-              onClick={() => setRecentsFilter('missed')} 
-              style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #444', color: '#fff', background: recentsFilter === 'missed' ? '#333' : 'transparent' }}
-            >Missed</button>
+          <div style={{ display: 'flex', gap: '10px', margin: '15px 0' }}>
+            <button onClick={() => setRecentsFilter('all')} style={{ flex: 1, padding: '8px', borderRadius: '8px', background: recentsFilter === 'all' ? '#333' : 'transparent', color: 'white', border: '1px solid #444' }}>All</button>
+            <button onClick={() => setRecentsFilter('missed')} style={{ flex: 1, padding: '8px', borderRadius: '8px', background: recentsFilter === 'missed' ? '#333' : 'transparent', color: 'white', border: '1px solid #444' }}>Missed</button>
           </div>
-
-          {isLoadingRecents ? <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Loading Recents...</div> : 
-            (recentsFilter === 'missed' ? recents.filter(r => parseInt(r.type) === 3 || parseInt(r.type) === 5) : recents).map((r, i) => (
+          {isLoadingRecents ? <div style={{textAlign:'center', color:'#888'}}>Loading...</div> : 
+            (recentsFilter === 'missed' ? recents.filter(r => r.type == 3 || r.type == 5) : recents).map((r, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '15px 0', borderBottom: '1px solid #333' }}>
                 <div style={{ flex: 1 }} onClick={() => handleCall(r.number || r.num)}>
-                  <div style={{ fontSize: '1.2rem', fontFamily: 'system-ui', color: (r.type == 3 || r.type == 5) ? '#ff3b30' : 'var(--text-color)', fontWeight: '500' }}>
-                    {r.cachedName || r.name || r.number || r.num}
-                  </div>
-                  <div style={{ color: '#888', fontSize: '0.9rem', fontFamily: 'system-ui', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                    {renderCallIcon(r.type)} 
-                    {r.date ? new Date(parseInt(r.date)).toLocaleString() : r.time}
+                  <div style={{ fontSize: '1.2rem', color: (r.type == 3 || r.type == 5) ? '#ff3b30' : 'white', fontWeight: '500' }}>{r.cachedName || r.name || r.number || r.num}</div>
+                  <div style={{ color: '#888', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    {renderCallIcon(r.type)} {r.date ? new Date(parseInt(r.date)).toLocaleString() : r.time}
                   </div>
                 </div>
-                <div style={{ padding: '10px', color: '#007aff', cursor: 'pointer' }} onClick={() => alert(`Showing info for ${r.cachedName || r.number}`)}>
-                  <Info size={22} />
-                </div>
+                <div style={{ padding: '10px', color: '#007aff' }}><Info size={22} /></div>
               </div>
             ))
           }
         </div>
       )}
 
-      {tab === 'contacts' && (
+{tab === 'contacts' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
-          {isLoadingContacts ? <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Loading Contacts...</div> : 
+          {isLoadingContacts ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>Loading...</div>
+          ) : contacts.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>
+              No contacts found. 
+              <br/><small>(Check if contacts are synced to your account)</small>
+            </div>
+          ) : (
             contacts.map((c, i) => (
-              <div key={i} onClick={() => handleCall(c.phones[0].number)} style={{ padding: '15px 0', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '1.2rem', fontFamily: 'system-ui', fontWeight: '500' }}>{c.name?.display || 'Unknown'}</div>
-                  <div style={{ color: '#888', fontSize: '0.95rem', fontFamily: 'system-ui', marginTop: '4px' }}>{c.phones[0].number}</div>
-                </div>
+              <div key={i} onClick={() => handleCall(c.phone)} style={{ padding: '15px 0', borderBottom: '1px solid #333' }}>
+                <div style={{ fontSize: '1.2rem', fontWeight: '500', color: '#fff' }}>{c.name}</div>
+                <div style={{ color: '#888', marginTop: '4px' }}>{c.phone}</div>
               </div>
             ))
-          }
+          )}
+        </div>
+      )}
+
+      {/* --- ADMIN VIEW --- */}
+      {tab === 'admin' && (
+        <div className="admin-container">
+          <div className="admin-section">
+            <h3><User size={18}/> Profile & Security</h3>
+            <div className="admin-row" style={{marginBottom: '10px'}}>
+              <label>SMS Username:</label>
+              <input type="text" value={config.userName} onChange={(e) => setConfig({...config, userName: e.target.value})} className="admin-input" />
+            </div>
+            <div className="admin-row">
+              <label>USSD Login PIN:</label>
+              <input type="text" value={config.pin} onChange={(e) => setConfig({...config, pin: e.target.value})} className="admin-input" />
+            </div>
+          </div>
+
+          <div className="admin-section">
+            <h3>My Accounts (Source)</h3>
+            {config.myAccounts.map((acc, idx) => (
+              <div key={idx} className="admin-item" style={{flexWrap: 'wrap'}}>
+                <input value={acc.number} onChange={e => { const newAccs = [...config.myAccounts]; newAccs[idx].number = e.target.value; setConfig({...config, myAccounts: newAccs}); }} placeholder="Account No." className="admin-input flex-1" />
+                <input value={acc.label} onChange={e => { const newAccs = [...config.myAccounts]; newAccs[idx].label = e.target.value; setConfig({...config, myAccounts: newAccs}); }} placeholder="Label (e.g. SAVINGS)" className="admin-input flex-1" />
+                <input value={acc.balance} type="number" onChange={e => { const newAccs = [...config.myAccounts]; newAccs[idx].balance = e.target.value; setConfig({...config, myAccounts: newAccs}); }} placeholder="Balance" className="admin-input" style={{width: '80px'}} />
+                <button onClick={() => { const newAccs = config.myAccounts.filter((_, i) => i !== idx); setConfig({...config, myAccounts: newAccs}); }} className="admin-btn-icon danger"><Delete size={18}/></button>
+              </div>
+            ))}
+            <button onClick={() => setConfig({...config, myAccounts: [...config.myAccounts, {number: '', label: 'ETB - ', balance: 0}]})} className="admin-btn full-width mt-2"><Plus size={16}/> Add My Account</button>
+          </div>
+
+          <div className="admin-section">
+            <h3>Saved Beneficiaries (Target)</h3>
+            {config.savedAccounts.map((acc, idx) => (
+              <div key={idx} className="admin-item column">
+                <div style={{display:'flex', gap:'10px', width:'100%'}}>
+                  <input value={acc.number} onChange={e => { const newAccs = [...config.savedAccounts]; newAccs[idx].number = e.target.value; setConfig({...config, savedAccounts: newAccs}); }} placeholder="Account No." className="admin-input flex-1" />
+                  <button onClick={() => { const newAccs = config.savedAccounts.filter((_, i) => i !== idx); setConfig({...config, savedAccounts: newAccs}); }} className="admin-btn-icon danger"><Delete size={18}/></button>
+                </div>
+                <input value={acc.name} onChange={e => { const newAccs = [...config.savedAccounts]; newAccs[idx].name = e.target.value; setConfig({...config, savedAccounts: newAccs}); }} placeholder="Full Name" className="admin-input full-width mt-2" />
+              </div>
+            ))}
+            <button onClick={() => setConfig({...config, savedAccounts: [...config.savedAccounts, {number: '', name: ''}]})} className="admin-btn full-width mt-2"><Plus size={16}/> Add Beneficiary</button>
+          </div>
+
+          <div className="admin-section">
+            <h3><Save size={18}/> Backup & Restore</h3>
+            <textarea value={importData} onChange={(e) => setImportData(e.target.value)} className="admin-textarea" placeholder="Paste JSON data here to import..."></textarea>
+            <div className="admin-actions">
+              <button onClick={() => setImportData(JSON.stringify(config, null, 2))} className="admin-btn"><Download size={16}/> Export</button>
+              <button onClick={() => { try { setConfig(JSON.parse(importData)); alert("Imported!"); } catch { alert("Invalid JSON"); } }} className="admin-btn primary"><Upload size={16}/> Import</button>
+            </div>
+          </div>
+          <br/><br/><br/>
         </div>
       )}
 
@@ -385,37 +444,24 @@ function App() {
 
       {/* --- USSD Modals --- */}
       {ussdState.visible && (
-        <>
+        <div className={ussdState.isLoading ? "ussd-loading-toast" : "ussd-overlay"}>
           {ussdState.isLoading ? (
-            <div className="ussd-loading-toast">
-              <div className="spinner"><div className="dot"></div><div className="dot"></div><div className="dot"></div><div className="dot"></div></div>
-              <span>USSD code running...</span>
-            </div>
+            <><div className="spinner"><div className="dot"/><div className="dot"/><div className="dot"/><div className="dot"/></div><span>USSD code running...</span></>
           ) : (
-            <div className="ussd-overlay">
-              <div className="ussd-box">
-                <div className="ussd-text">{ussdState.message}</div>
-                <input type="text" className="ussd-input" autoFocus value={ussdState.input} onChange={(e) => setUssdState({...ussdState, input: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleUssdSubmit()} />
-                <div className="ussd-actions">
-                  <button className="ussd-btn" onClick={closeUssd}>Cancel</button>
-                  <button className="ussd-btn" onClick={handleUssdSubmit}>Send</button>
-                </div>
+            <div className="ussd-box">
+              <div className="ussd-text">{ussdState.message}</div>
+              <input type="text" className="ussd-input" autoFocus value={ussdState.input} onChange={(e) => setUssdState({...ussdState, input: e.target.value})} onKeyDown={(e) => e.key === 'Enter' && handleUssdSubmit()} />
+              <div className="ussd-actions">
+                <button className="ussd-btn" onClick={closeUssd}>Cancel</button>
+                <button className="ussd-btn" onClick={handleUssdSubmit}>Send</button>
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {showWarning && <div className="warning-modal">Input required. Try Again</div>}
-
-      {ussdState.mmiError && (
-        <div className="mmi-error-overlay">
-          <div className="mmi-error-box">
-            <div className="mmi-text">Connection problem or invalid MMI code.</div>
-            <button className="mmi-btn" onClick={closeUssd}>OK</button>
-          </div>
-        </div>
-      )}
+      {ussdState.mmiError && <div className="mmi-error-overlay"><div className="mmi-error-box"><div className="mmi-text">Connection problem or invalid MMI code.</div><button className="mmi-btn" onClick={closeUssd}>OK</button></div></div>}
     </div>
   );
 }
